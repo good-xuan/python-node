@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>星 空 · 浩瀚</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #03040c;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #sky {
+    position: fixed;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ---------- 所有覆盖层不接收鼠标事件 ---------- */
+  .overlay {
+    position: fixed;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  /* ---------- 顶部标题 ---------- */
+  header {
+    top: 0; left: 0; right: 0;
+    padding-top: max(7vh, 42px);
+    text-align: center;
+    animation: fadeDown 2.4s cubic-bezier(.22,.8,.3,1) both;
+  }
+
+  header h1 {
+    font-size: clamp(26px, 5vw, 54px);
+    font-weight: 200;
+    letter-spacing: 0.62em;
+    text-indent: 0.62em;
+    color: rgba(216, 232, 255, 0.94);
+    text-shadow:
+      0 0 26px rgba(130, 180, 255, 0.65),
+      0 0 70px rgba(95, 140, 255, 0.38),
+      0 0 130px rgba(80, 110, 255, 0.18);
+  }
+
+  header p {
+    margin-top: clamp(14px, 2.2vh, 24px);
+    font-size: clamp(10px, 1.25vw, 14px);
+    font-weight: 300;
+    letter-spacing: 0.46em;
+    text-indent: 0.46em;
+    color: rgba(158, 190, 240, 0.58);
+    text-shadow: 0 0 24px rgba(110, 160, 255, 0.4);
+  }
+
+  /* ---------- 中央呼吸引导 ---------- */
+  .breath {
+    left: 50%;
+    top: 50%;
+    width: min(46vmin, 340px);
+    height: min(46vmin, 340px);
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 3s ease 0.8s both;
+  }
+
+  .ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    will-change: transform, opacity;
+    transform: scale(0.62);
+  }
+
+  .r1 {
+    border: 1px solid rgba(150, 196, 255, 0.52);
+    box-shadow:
+      0 0 55px rgba(105, 165, 255, 0.30),
+      0 0 120px rgba(85, 130, 255, 0.16),
+      inset 0 0 70px rgba(105, 165, 255, 0.15);
+  }
+
+  .r2 {
+    border: 1px solid rgba(130, 175, 255, 0.22);
+    box-shadow: 0 0 90px rgba(90, 140, 255, 0.16);
+  }
+
+  .core {
+    position: absolute;
+    width: 42%;
+    height: 42%;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      rgba(190, 220, 255, 0.26) 0%,
+      rgba(130, 175, 255, 0.10) 45%,
+      rgba(90, 130, 255, 0) 72%);
+    filter: blur(9px);
+    will-change: transform, opacity;
+  }
+
+  .btext {
+    position: relative;
+    z-index: 3;
+    font-size: clamp(12px, 1.6vw, 17px);
+    font-weight: 300;
+    letter-spacing: 0.5em;
+    text-indent: 0.5em;
+    color: rgba(206, 226, 255, 0.92);
+    text-shadow: 0 0 22px rgba(140, 185, 255, 0.85);
+    will-change: opacity;
+    transition: opacity 0.6s ease;
+  }
+
+  /* ---------- 底部文字 ---------- */
+  footer {
+    left: 0; right: 0;
+    bottom: max(4.5vh, 26px);
+    text-align: center;
+    font-size: clamp(10px, 1.15vw, 13px);
+    font-weight: 300;
+    letter-spacing: 0.36em;
+    text-indent: 0.36em;
+    color: rgba(146, 178, 230, 0.40);
+    animation: fadeIn 3.4s ease 1.6s both;
+  }
+
+  /* ---------- 动画 ---------- */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* 小屏微调 */
+  @media (max-height: 560px) {
+    header { padding-top: 26px; }
+    .breath { width: min(52vmin, 250px); height: min(52vmin, 250px); }
+    footer { bottom: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="sky"></canvas>
+
+<header class="overlay">
+  <h1>星 空</h1>
+  <p>浩 瀚 · 宁 静</p>
+</header>
+
+<div class="breath overlay">
+  <div class="ring r2"></div>
+  <div class="ring r1"></div>
+  <div class="core"></div>
+  <div class="btext">吸 气</div>
+</div>
+
+<footer class="overlay">静下心来，感受这片无垠的星海</footer>
+
+<script>
+(() => {
+'use strict';
+
+/* =========================================================
+   基础
+   ========================================================= */
+const canvas = document.getElementById('sky');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+const TAU = Math.PI * 2;
+const rand = (a, b) => a + Math.random() * (b - a);
+
+let W = 0, H = 0, DPR = 1, bgGrad = null;
+
+/* =========================================================
+   星空图层数据
+   ========================================================= */
+const layers = [
+  { stars: [], depth: 0.014, sizeMin: 0.35, sizeMax: 0.85, density: 2400, alphaMax: 0.50 },
+  { stars: [], depth: 0.034, sizeMin: 0.60, sizeMax: 1.35, density: 7200, alphaMax: 0.78 },
+  { stars: [], depth: 0.075, sizeMin: 1.10, sizeMax: 2.30, density: 22000, alphaMax: 1.00 }
+];
+
+/* 星云配置：低饱和冷色，营造深空氛围 */
+const NEBULAS = [
+  { x: 0.16, y: 0.26, r: 0.44, h: 262, a: 0.150, sp: 0.052, ph: 0.0 },
+  { x: 0.84, y: 0.20, r: 0.38, h: 212, a: 0.125, sp: 0.041, ph: 1.7 },
+  { x: 0.62, y: 0.74, r: 0.48, h: 288, a: 0.115, sp: 0.060, ph: 3.2 },
+  { x: 0.22, y: 0.80, r: 0.34, h: 196, a: 0.100, sp: 0.048, ph: 4.5 },
+  { x: 0.50, y: 0.46, r: 0.56, h: 236, a: 0.085, sp: 0.031, ph: 2.3 }
+];
+
+/* 运行数据 */
+let meteors = [];
+let meteorTimer = 2.5;
+
+/* 视差 */
+let mx = 0, my = 0, tmx = 0, tmy = 0;
+
+/* 银河离屏画布 */
+let mwCanvas = null;
+const PAD = 200;
+
+/* =========================================================
+   构建：星星
+   ========================================================= */
+function buildStars() {
+  for (const layer of layers) {
+    const count = Math.round((W * H) / layer.density);
+    const arr = new Array(count);
+
+    for (let i = 0; i < count; i++) {
+      const t = Math.random();
+      let color;
+
+      if (t < 0.74) {
+        color = 'rgba(226, 236, 255, 1)';       // 冷白
+      } else if (t < 0.88) {
+        color = 'rgba(196, 216, 255, 1)';       // 淡蓝
+      } else if (t < 0.96) {
+        color = 'rgba(255, 232, 206, 1)';       // 暖黄
+      } else {
+        color = 'rgba(255, 214, 232, 1)';       // 淡粉
+      }
+
+      arr[i] = {
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: rand(layer.sizeMin, layer.sizeMax),
+        a: rand(0.22, layer.alphaMax),
+        ph: Math.random() * TAU,
+        sp: rand(0.22, 1.15),
+        c: color
+      };
+    }
+    layer.stars = arr;
+  }
+}
+
+/* =========================================================
+   构建：银河带
+   ========================================================= */
+function buildMilkyWay() {
+  const mw = W + PAD * 2;
+  const mh = H + PAD * 2;
+
+  mwCanvas = document.createElement('canvas');
+  mwCanvas.width = mw;
+  mwCanvas.height = mh;
+
+  const g = mwCanvas.getContext('2d');
+  g.clearRect(0, 0, mw, mh);
+
+  const cx = mw / 2;
+  const cy = mh / 2;
+  const angle = -0.52;
+  const len = Math.hypot(mw, mh) * 0.60;
+  const halfW = Math.min(mw, mh) * 0.30;
+
+  g.save();
+  g.translate(cx, cy);
+  g.rotate(angle);
+
+  /* --- 柔和辉光底层 --- */
+  for (let i = 0; i < 28; i++) {
+    const t = rand(-1, 1);
+    const px = t * len;
+    const py = rand(-halfW, halfW) * 0.62;
+    const rad = rand(halfW * 0.55, halfW * 1.6);
+    const hue = rand(208, 266);
+
+    const rg = g.createRadialGradient(px, py, 0, px, py, rad);
+    rg.addColorStop(0.00, `hsla(${hue}, 72%, 72%, 0.055)`);
+    rg.addColorStop(0.42, `hsla(${hue}, 68%, 62%, 0.024)`);
+    rg.addColorStop(1.00, `hsla(${hue}, 64%, 52%, 0)`);
+    g.fillStyle = rg;
+    g.beginPath();
+    g.arc(px, py, rad, 0, TAU);
+    g.fill();
+  }
+
+  /* --- 密集星点 --- */
+  const N = Math.round(len * halfW * 0.019);
+  for (let i = 0; i < N; i++) {
+    const t = rand(-1, 1);
+    const density = 1 - Math.pow(Math.abs(t), 1.7) * 0.86;
+    if (Math.random() > density) continue;
+
+    const px = t * len;
+
+    let gy = 0;
+    for (let k = 0; k < 3; k++) gy += rand(-1, 1);
+    gy = (gy / 3) * halfW * 1.55;
+
+    const r = rand(0.28, 1.05);
+    const a = rand(0.14, 0.72) * density;
+
+    const tint = Math.random();
+    let col;
+    if (tint < 0.70)      col = `rgba(222, 233, 255, ${a})`;
+    else if (tint < 0.88) col = `rgba(255, 228, 204, ${a * 0.9})`;
+    else                  col = `rgba(198, 214, 255, ${a})`;
+
+    g.fillStyle = col;
+    g.beginPath();
+    g.arc(px, gy, r, 0, TAU);
+    g.fill();
+  }
+
+  /* --- 银河中的亮星 --- */
+  const brightCount = Math.round(len * 0.055);
+  for (let i = 0; i < brightCount; i++) {
+    const t = rand(-1, 1);
+    const px = t * len;
+
+    let gy = 0;
+    for (let k = 0; k < 3; k++) gy += rand(-1, 1);
+    gy = (gy / 3) * halfW * 1.35;
+
+    const r = rand(0.75, 1.75);
+
+    const rg = g.createRadialGradient(px, gy, 0, px, gy, r * 9);
+    rg.addColorStop(0.00, 'rgba(214, 232, 255, 0.40)');
+    rg.addColorStop(0.35, 'rgba(190, 216, 255, 0.14)');
+    rg.addColorStop(1.00, 'rgba(170, 200, 255, 0)');
+    g.fillStyle = rg;
+    g.beginPath();
+    g.arc(px, gy, r * 9, 0, TAU);
+    g.fill();
+
+    g.fillStyle = `rgba(255, 255, 255, ${rand(0.55, 0.95)})`;
+    g.beginPath();
+    g.arc(px, gy, r, 0, TAU);
+    g.fill();
+  }
+
+  g.restore();
+}
+
+/* =========================================================
+   尺寸
+   ========================================================= */
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth;
+  H = window.innerHeight;
+
+  canvas.width = Math.round(W * DPR);
+  canvas.height = Math.round(H * DPR);
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  /* 深空背景渐变 */
+  bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+  bgGrad.addColorStop(0.00, '#02030a');
+  bgGrad.addColorStop(0.30, '#060818');
+  bgGrad.addColorStop(0.60, '#080b1e');
+  bgGrad.addColorStop(0.85, '#070a19');
+  bgGrad.addColorStop(1.00, '#03040c');
+
+  mx = tmx = W / 2;
+  my = tmy = H / 2;
+
+  buildStars();
+  buildMilkyWay();
+}
+
+/* =========================================================
+   流星
+   ========================================================= */
+function spawnMeteor() {
+  const ang = rand(0.34, 0.66);
+  const spd = rand(620, 1180);
+
+  meteors.push({
+    x: rand(-0.15, 0.85) * W,
+    y: rand(-0.20, 0.32) * H,
+    vx: Math.cos(ang) * spd,
+    vy: Math.sin(ang) * spd,
+    len: rand(130, 340),
+    w: rand(0.9, 2.1),
+    life: 1,
+    decay: rand(0.42, 0.78)
+  });
+}
+
+function updateMeteors(dt) {
+  meteorTimer -= dt;
+  if (meteorTimer <= 0) {
+    meteorTimer = rand(3.2, 9.5);
+    const n = Math.random() < 0.28 ? 2 : 1;
+    for (let i = 0; i < n; i++) spawnMeteor();
+  }
+
+  for (let i = meteors.length - 1; i >= 0; i--) {
+    const m = meteors[i];
+    m.x += m.vx * dt;
+    m.y += m.vy * dt;
+    m.life -= m.decay * dt;
+
+    if (m.life <= 0 || m.x > W + 500 || m.y > H + 500) {
+      meteors.splice(i, 1);
+    }
+  }
+}
+
+/* =========================================================
+   绘制：星云
+   ========================================================= */
+function drawNebulas(t, ox, oy) {
+  const R = Math.max(W, H);
+
+  for (const n of NEBULAS) {
+    const px = n.x * W + Math.sin(t * n.sp + n.ph) * 42 - ox * 0.016;
+    const py = n.y * H + Math.cos(t * n.sp * 0.8 + n.ph) * 28 - oy * 0.016;
+    const rad = n.r * R;
+
+    const pulse = 0.86 + 0.14 * Math.sin(t * 0.23 + n.ph);
+
+    const g = ctx.createRadialGradient(px, py, 0, px, py, rad);
+    g.addColorStop(0.00, `hsla(${n.h}, 70%, 70%, ${n.a * pulse})`);
+    g.addColorStop(0.36, `hsla(${n.h}, 66%, 58%, ${n.a * 0.46 * pulse})`);
+    g.addColorStop(0.72, `hsla(${n.h}, 62%, 48%, ${n.a * 0.14 * pulse})`);
+    g.addColorStop(1.00, `hsla(${n.h}, 60%, 42%, 0)`);
+
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(px, py, rad, 0, TAU);
+    ctx.fill();
+  }
+}
+
+/* =========================================================
+   绘制：星星
+   ========================================================= */
+function drawStars(t, ox, oy) {
+  for (const layer of layers) {
+    const dx = -ox * layer.depth;
+    const dy = -oy * layer.depth;
+    const stars = layer.stars;
+    const big = layer.sizeMin > 1;
+
+    for (let i = 0; i < stars.length; i++) {
+      const s = stars[i];
+      const x = s.x + dx;
+      const y = s.y + dy;
+
+      if (x < -8 || x > W + 8 || y < -8 || y > H + 8) continue;
+
+      const tw = 0.52 + 0.48 * Math.sin(t * s.sp + s.ph);
+      const a = s.a * tw;
+      if (a < 0.025) continue;
+
+      ctx.globalAlpha = a;
+      ctx.fillStyle = s.c;
+
+      if (s.r < 1.05) {
+        const sz = s.r * 1.7;
+        ctx.fillRect(x, y, sz, sz);
+      } else {
+        ctx.beginPath();
+        ctx.arc(x, y, s.r, 0, TAU);
+        ctx.fill();
+
+        /* 大星柔光 */
+        if (big && s.r > 1.65) {
+          const g = ctx.createRadialGradient(x, y, 0, x, y, s.r * 6.5);
+          g.addColorStop(0, 'rgba(190, 218, 255, 0.42)');
+          g.addColorStop(0.4, 'rgba(150, 190, 255, 0.12)');
+          g.addColorStop(1, 'rgba(130, 170, 255, 0)');
+          ctx.globalAlpha = a * 0.55;
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(x, y, s.r * 6.5, 0, TAU);
+          ctx.fill();
+        }
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* =========================================================
+   绘制：流星
+   ========================================================= */
+function drawMeteors() {
+  if (!meteors.length) return;
+
+  for (const m of meteors) {
+    const a = m.life < 0 ? 0 : (m.life > 1 ? 1 : m.life);
+    const spd = Math.hypot(m.vx, m.vy) || 1;
+    const tailX = m.x - (m.vx / spd) * m.len;
+    const tailY = m.y - (m.vy / spd) * m.len;
+
+    /* 尾迹 */
+    const g = ctx.createLinearGradient(m.x, m.y, tailX, tailY);
+    g.addColorStop(0.00, `rgba(255, 255, 255, ${a})`);
+    g.addColorStop(0.12, `rgba(210, 232, 255, ${a * 0.72})`);
+    g.addColorStop(0.48, `rgba(160, 198, 255, ${a * 0.22})`);
+    g.addColorStop(1.00, 'rgba(130, 170, 255, 0)');
+
+    ctx.strokeStyle = g;
+    ctx.lineWidth = m.w;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(m.x, m.y);
+    ctx.lineTo(tailX, tailY);
+    ctx.stroke();
+
+    /* 头部光晕 */
+    const hg = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.w * 10);
+    hg.addColorStop(0.00, `rgba(226, 242, 255, ${a * 0.62})`);
+    hg.addColorStop(0.35, `rgba(180, 215, 255, ${a * 0.20})`);
+    hg.addColorStop(1.00, 'rgba(160, 200, 255, 0)');
+    ctx.fillStyle = hg;
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, m.w * 10, 0, TAU);
+    ctx.fill();
+
+    /* 核心 */
+    ctx.fillStyle = `rgba(255, 255, 255, ${a})`;
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, m.w * 1.35, 0, TAU);
+    ctx.fill();
+  }
+}
+
+/* =========================================================
+   主渲染
+   ========================================================= */
+function render(t) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+
+  /* 深空底色 */
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  /* 平滑视差 */
+  mx += (tmx - mx) * 0.045;
+  my += (tmy - my) * 0.045;
+  const ox = mx - W / 2;
+  const oy = my - H / 2;
+
+  ctx.globalCompositeOperation = 'lighter';
+
+  /* 星云 */
+  drawNebulas(t, ox, oy);
+
+  /* 银河 */
+  if (mwCanvas) {
+    ctx.globalAlpha = 0.92;
+    ctx.drawImage(mwCanvas, -PAD - ox * 0.022, -PAD - oy * 0.022);
+    ctx.globalAlpha = 1;
+  }
+
+  /* 星星 */
+  drawStars(t, ox, oy);
+
+  /* 流星 */
+  drawMeteors();
+
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+/* =========================================================
+   呼吸引导
+   ========================================================= */
+const ring1 = document.querySelector('.r1');
+const ring2 = document.querySelector('.r2');
+const core  = document.querySelector('.core');
+const btext = document.querySelector('.btext');
+
+const BREATH_IN = 4.0;   // 吸气
+const BREATH_HOLD = 2.0; // 屏息
+const BREATH_OUT = 6.0;  // 呼气
+const BREATH_TOTAL = BREATH_IN + BREATH_HOLD + BREATH_OUT;
+
+let breathTime = 0;
+let lastText = '';
+
+const easeInOut = p => p < 0.5
+  ? 2 * p * p
+  : 1 - Math.pow(-2 * p + 2, 2) / 2;
+
+function updateBreath(dt) {
+  breathTime += dt;
+  if (breathTime >= BREATH_TOTAL) breathTime -= BREATH_TOTAL;
+
+  let p, txt;
+
+  if (breathTime < BREATH_IN) {
+    p = breathTime / BREATH_IN;
+    txt = '吸 气';
+  } else if (breathTime < BREATH_IN + BREATH_HOLD) {
+    p = 1;
+    txt = '屏 息';
+  } else {
+    p = 1 - (breathTime - BREATH_IN - BREATH_HOLD) / BREATH_OUT;
+    txt = '呼 气';
+  }
+
+  const e = easeInOut(Math.max(0, Math.min(1, p)));
+  const scale = 0.62 + 0.38 * e;
+
+  ring1.style.transform = `scale(${scale.toFixed(4)})`;
+  ring1.style.opacity = (0.26 + 0.58 * e).toFixed(3);
+
+  ring2.style.transform = `scale(${(scale * 1.24).toFixed(4)})`;
+  ring2.style.opacity = (0.10 + 0.26 * e).toFixed(3);
+
+  core.style.transform = `scale(${(0.72 + 0.42 * e).toFixed(4)})`;
+  core.style.opacity = (0.42 + 0.58 * e).toFixed(3);
+
+  if (txt !== lastText) {
+    btext.textContent = txt;
+    lastText = txt;
+  }
+  btext.style.opacity = (0.48 + 0.50 * e).toFixed(3);
+}
+
+/* =========================================================
+   主循环
+   ========================================================= */
+let lastTime = 0;
+
+function loop(now) {
+  if (!lastTime) lastTime = now;
+
+  let dt = (now - lastTime) / 1000;
+  lastTime = now;
+
+  /* 防止切后台后跳帧 */
+  if (dt > 0.05) dt = 0.05;
+
+  const t = now / 1000;
+
+  updateMeteors(dt);
+  updateBreath(dt);
+  render(t);
+
+  requestAnimationFrame(loop);
+}
+
+/* =========================================================
+   事件
+   ========================================================= */
+window.addEventListener('pointermove', e => {
+  tmx = e.clientX;
+  tmy = e.clientY;
+}, { passive: true });
+
+window.addEventListener('touchmove', e => {
+  if (e.touches.length) {
+    tmx = e.touches[0].clientX;
+    tmy = e.touches[0].clientY;
+  }
+}, { passive: true });
+
+/* 窗口尺寸变化（防抖） */
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(resize, 160);
+});
+
+/* =========================================================
+   启动
+   ========================================================= */
+resize();
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
